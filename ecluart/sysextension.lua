@@ -5,13 +5,7 @@ local sysextension = {}
 
 --#region specialfolders
 
--- Gets the special folder full path.
-local function getSpecialFolderPath(csidl)
-  local WshShell = sys.COM("Shell.Application")
-  return WshShell:NameSpace(csidl).self.path
-end
-
--- Constants identify special folders.
+-- Constant identify special folders.
 local CSIDL = {
   appdata = 0x001a,
   commonappdata = 0x0023,
@@ -38,6 +32,13 @@ local CSIDL = {
   windows = 0x0024,
 }
 
+-- Get the special folder full path.
+local function getSpecialFolderPath(csidl)
+  if type(csidl) ~= "number" then return end
+  local WshShell = sys.COM("Shell.Application")
+  return WshShell:NameSpace(csidl).self.path
+end
+
 -- Get a proxy table representing special folders.
 sysextension.specialfolders = {
   desktop = getSpecialFolderPath(CSIDL.desktop),
@@ -55,7 +56,7 @@ sysextension.specialfolders = {
 
 sysextension.shortcut = {}
 
--- Creates a shortcut in the specified folder.
+-- Create a shortcut in the specified folder.
 function sysextension.shortcut.create(folder, name, target)
   local shellObject = sys.COM("WScript.Shell")
 
@@ -66,7 +67,7 @@ function sysextension.shortcut.create(folder, name, target)
   shortcutFile:Save()
 end
 
--- Deletes a shortcut from the specified folder.
+-- Delete a shortcut from the specified folder.
 function sysextension.shortcut.delete(folder, name)
   local shortcutFile = sys.File(folder .. "\\" .. name .. ".lnk")
 
@@ -77,18 +78,46 @@ end
 
 --#endregion
 
---#region
+--#region filetype
 
--- Adds a file to the most recently used list.
-function sysextension.addtorecent(file)
-  local WshShell = sys.COM("Shell.Application")
-  --WshShell:AddToRecent(file)
-  --WshShell:FileRun()
-  --WshShell:SearchCommand()
+sysextension.filetype = {}
+
+local ROOT = "HKEY_CURRENT_USER"
+local KEY = "Software\\Classes\\"
+local ICON = "\\DefaultIcon"
+local COMMAND = "\\shell\\open\\command"
+
+
+function sysextension.filetype.add(path, name)
+  path = string.lower(path)
+  name = string.lower(name)
+
+  sys.registry.write(ROOT, KEY .. "." .. name, nil, name);
+  sys.registry.write(ROOT, KEY .. name, nil, name .. " application");
+  sys.registry.write(ROOT, KEY .. name .. ICON, nil, path .. name .. ".exe,0");
+  sys.registry.write(ROOT, KEY .. name .. COMMAND, nil, '"' .. path .. name .. '.exe" "%1"');
+end
+
+function sysextension.filetype.remove(name)
+  name = string.lower(name)
+
+  sys.registry.delete(ROOT, KEY .. "." .. name)
+  sys.registry.delete(ROOT, KEY .. name)
+  sys.registry.delete(ROOT, KEY .. name .. ICON)
+  sys.registry.delete(ROOT, KEY .. name .. COMMAND)
 end
 
 --#endregion
 
+--#region miscellaneous
 
+-- Add a file to the most recently used list.
+function sysextension.addtorecent(file)
+  if type(file) ~= "string" then return end
+  local WshShell = sys.COM("Shell.Application")
+  WshShell:AddToRecent(file)
+end
+
+--#endregion
 
 return sysextension
